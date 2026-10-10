@@ -1,0 +1,80 @@
+services:
+  db-cliente-a:
+    image: postgres:16
+    container_name: odoo-cliente-a-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: ${POSTGRES_USER_A}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD_A}
+    volumes:
+      - postgres_cliente_a:/var/lib/postgresql/data
+    networks:
+      - cliente_a_network
+
+  odoo-cliente-a:
+    image: odoo:19.0
+    container_name: odoo-cliente-a
+    restart: unless-stopped
+    depends_on:
+      - db-cliente-a
+    ports:
+      - "8069:8069"
+    environment:
+      HOST: db-cliente-a
+      PORT: 5432
+      USER: ${POSTGRES_USER_A}
+      PASSWORD: ${POSTGRES_PASSWORD_A}
+
+    volumes:
+      - odoo_cliente_a:/var/lib/odoo
+      - addons_cliente_a:/mnt/extra-addons
+      - ./config/odoo-cliente-a.conf:/etc/odoo/odoo.conf:ro
+    networks:
+      - cliente_a_network
+
+  db-cliente-b:
+    image: postgres:16
+    container_name: odoo-cliente-b-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: ${POSTGRES_USER_B}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD_B}
+    volumes:
+      - postgres_cliente_b:/var/lib/postgresql/data
+    networks:
+      - cliente_b_network
+
+  odoo-cliente-b:
+    image: odoo:19.0
+    container_name: odoo-cliente-b
+    restart: unless-stopped
+    depends_on:
+      - db-cliente-b
+    ports:
+      - "8070:8069"
+    environment:
+      HOST: db-cliente-b
+      PORT: 5432
+      USER: ${POSTGRES_USER_B}
+      PASSWORD: ${POSTGRES_PASSWORD_B}
+
+    volumes:
+      - odoo_cliente_b:/var/lib/odoo
+      - addons_cliente_b:/mnt/extra-addons
+      - ./config/odoo-cliente-b.conf:/etc/odoo/odoo.conf:ro
+    networks:
+      - cliente_b_network
+
+volumes:
+  postgres_cliente_a:
+  odoo_cliente_a:
+  addons_cliente_a:
+  postgres_cliente_b:
+  odoo_cliente_b:
+  addons_cliente_b:
+
+networks:
+  cliente_a_network:
+  cliente_b_network:

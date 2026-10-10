@@ -1,14 +1,9 @@
-.terraform/
-*.tfstate
-*.tfstate.*
-*.tfvars
-!*.tfvars.example
-*.tfplan
+# Local secrets
 .env
-.env.*
-!.env.example
-*.pem
-*.key
-*.p12
-*.pfx
-__pycache__/
+
+# Runtime data and local overrides
+data/
+*.log
+
+#odoo configuration files
+config/*.conf

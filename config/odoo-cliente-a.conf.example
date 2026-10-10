@@ -1,0 +1,7 @@
+[options]
+admin_passwd = change_me_master_cliente_a
+db_host = db-cliente-a
+db_port = 5432
+db_user = change_me_postgres_user_a
+db_password = change_me_postgres_password_a
+data_dir = /var/lib/odoo
