@@ -1,0 +1,43 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: verify-client-db-permissions
+  namespace: odoo-multitenant
+spec:
+  backoffLimit: 1
+  ttlSecondsAfterFinished: 300
+  template:
+    spec:
+      restartPolicy: Never
+      serviceAccountName: db-bootstrap
+      containers:
+        - name: verify-permissions
+          image: postgres:16-alpine
+          env:
+            - name: PGHOST
+              value: "10.184.0.3"
+            - name: PGPORT
+              value: "5432"
+            - name: PGUSER
+              value: "postgres"
+            - name: PGSSLMODE
+              value: "require"
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              export PGPASSWORD="$(cat /var/run/secrets/cloudsql/postgres-password)"
+              psql -d cliente_a_cloud -At -c "SELECT 'cliente_a_cloud=' || has_schema_privilege('odoo_cliente_a', 'public', 'CREATE');"
+              psql -d cliente_b_cloud -At -c "SELECT 'cliente_b_cloud=' || has_schema_privilege('odoo_cliente_b', 'public', 'CREATE');"
+              unset PGPASSWORD
+          volumeMounts:
+            - name: postgres-admin-password
+              mountPath: /var/run/secrets/cloudsql
+              readOnly: true
+      volumes:
+        - name: postgres-admin-password
+          csi:
+            driver: secrets-store-gke.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: db-bootstrap-admin-password

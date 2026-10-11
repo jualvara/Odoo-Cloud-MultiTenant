@@ -1,0 +1,30 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: odoo-public
+  namespace: odoo-multitenant
+  annotations:
+    kubernetes.io/ingress.class: gce
+    kubernetes.io/ingress.global-static-ip-name: odoo-public-ip
+spec:
+  rules:
+    - host: cliente-a.34.8.217.186.nip.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: odoo-cliente-a
+                port:
+                  number: 8069
+    - host: cliente-b.34.8.217.186.nip.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: odoo-cliente-b
+                port:
+                  number: 8069

@@ -172,3 +172,31 @@ El clúster local tiene un solo nodo y los PVC usan almacenamiento `ReadWriteOnc
 - Seis volúmenes persistentes independientes: base de datos, filestore y addons por cliente.
 - Secretos locales excluidos de Git.
 - Manifiestos Kubernetes para dos clientes, persistencia, comprobaciones de salud y autoescalado de Odoo Cliente A.
+
+## Despliegue cloud en GKE
+
+La infraestructura cloud se define en `infra/terraform`: VPC privada, GKE regional, Cloud SQL privado y las identidades de carga de trabajo. Cada Odoo usa una identidad de Google distinta y solo puede leer sus propios secretos en Secret Manager.
+
+Los manifiestos de `k8s/cloud/odoo-cliente-a.yaml` y `k8s/cloud/odoo-cliente-b.yaml` ya conectan cada entorno con su base de Cloud SQL correspondiente:
+
+| Cliente | Base | Usuario PostgreSQL | Secretos permitidos |
+|---|---|---|---|
+| A | `cliente_a_cloud` | `odoo_cliente_a` | contraseña de A y clave maestra de A |
+| B | `cliente_b_cloud` | `odoo_cliente_b` | contraseña de B y clave maestra de B |
+
+Las credenciales se montan directamente desde Secret Manager; no se crean objetos `Secret` de Kubernetes y no hay contraseñas en los manifiestos.
+
+El filestore compartido `ReadWriteMany` se define en `k8s/cloud/filestore-rwx.yaml`. Crea un Filestore Basic HDD de 100 GiB por cliente en la VPC privada mediante el controlador CSI de GKE. Es un tamaño pensado para prácticas; producción debe evaluar Filestore regional y una política de copias.
+
+Una vez aplicado Terraform y disponible el controlador CSI, el orden de despliegue cloud es:
+
+```powershell
+kubectl apply -f k8s\cloud\filestore-rwx.yaml
+kubectl get pvc -n odoo-multitenant --watch
+kubectl apply -f k8s\cloud\odoo-cliente-a.yaml
+kubectl apply -f k8s\cloud\odoo-cliente-b.yaml
+```
+
+Los PVC usan política `Retain`: borrar un PVC no borra automáticamente el Filestore ni sus adjuntos. Antes de destruir el entorno hay que eliminar explícitamente esos filestores, una vez realizada o descartada la copia necesaria.
+
+La guía de disponibilidad, escalado, monitorización, copias, recuperación y control de costes está en [docs/cloud-operations.md](docs/cloud-operations.md).

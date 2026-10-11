@@ -1,0 +1,41 @@
+# Un StorageClass propio para que los volúmenes de Filestore se creen en la
+# VPC privada del proyecto.
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: odoo-filestore-rwx
+provisioner: filestore.csi.storage.gke.io
+reclaimPolicy: Retain
+volumeBindingMode: Immediate
+allowVolumeExpansion: true
+parameters:
+  # "standard" corresponde al nivel Basic HDD de Filestore.
+  tier: standard
+  network: odoo-final-vpc
+  protocol: NFS_V3
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: odoo-cliente-a-filestore-rwx
+  namespace: odoo-multitenant
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: odoo-filestore-rwx
+  resources:
+    requests:
+      storage: 100Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: odoo-cliente-b-filestore-rwx
+  namespace: odoo-multitenant
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: odoo-filestore-rwx
+  resources:
+    requests:
+      storage: 100Gi

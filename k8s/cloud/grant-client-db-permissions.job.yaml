@@ -1,0 +1,43 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: grant-client-db-permissions
+  namespace: odoo-multitenant
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 300
+  template:
+    spec:
+      restartPolicy: Never
+      serviceAccountName: db-bootstrap
+      containers:
+        - name: grant-permissions
+          image: postgres:16-alpine
+          env:
+            - name: PGHOST
+              value: "10.184.0.3"
+            - name: PGPORT
+              value: "5432"
+            - name: PGUSER
+              value: "postgres"
+            - name: PGSSLMODE
+              value: "require"
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              export PGPASSWORD="$(cat /var/run/secrets/cloudsql/postgres-password)"
+              psql -d cliente_a_cloud -v ON_ERROR_STOP=1 -c 'GRANT USAGE, CREATE ON SCHEMA public TO odoo_cliente_a;'
+              psql -d cliente_b_cloud -v ON_ERROR_STOP=1 -c 'GRANT USAGE, CREATE ON SCHEMA public TO odoo_cliente_b;'
+              unset PGPASSWORD
+          volumeMounts:
+            - name: postgres-admin-password
+              mountPath: /var/run/secrets/cloudsql
+              readOnly: true
+      volumes:
+        - name: postgres-admin-password
+          csi:
+            driver: secrets-store-gke.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: db-bootstrap-admin-password
