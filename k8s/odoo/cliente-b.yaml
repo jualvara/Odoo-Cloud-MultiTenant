@@ -1,0 +1,97 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: odoo-cliente-b
+  namespace: odoo-multitenant
+spec:
+  selector:
+    app: odoo-cliente-b
+  ports:
+    - name: http
+      port: 8069
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: odoo-cliente-b
+  namespace: odoo-multitenant
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: odoo-cliente-b
+  template:
+    metadata:
+      labels:
+        app: odoo-cliente-b
+    spec:
+      initContainers:
+        - name: crear-configuracion
+          image: busybox:1.36
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              cat > /config/odoo.conf <<EOF
+              [options]
+              admin_passwd = ${ODOO_MASTER_PASSWORD}
+              db_host = db-cliente-b
+              db_port = 5432
+              db_user = ${POSTGRES_USER}
+              db_password = ${POSTGRES_PASSWORD}
+              data_dir = /var/lib/odoo
+              EOF
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: cliente-b-secrets
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: cliente-b-secrets
+                  key: POSTGRES_PASSWORD
+            - name: ODOO_MASTER_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: cliente-b-secrets
+                  key: ODOO_MASTER_PASSWORD
+          volumeMounts:
+            - name: odoo-config
+              mountPath: /config
+      containers:
+        - name: odoo
+          image: odoo:19.0
+          ports:
+            - name: http
+              containerPort: 8069
+          readinessProbe:
+            httpGet:
+              path: /web/login
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 18
+          livenessProbe:
+            httpGet:
+              path: /web/login
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 6
+          volumeMounts:
+            - name: filestore
+              mountPath: /var/lib/odoo
+            - name: odoo-config
+              mountPath: /etc/odoo/odoo.conf
+              subPath: odoo.conf
+      volumes:
+        - name: filestore
+          persistentVolumeClaim:
+            claimName: odoo-cliente-b-filestore-pvc
+        - name: odoo-config
+          emptyDir: {}

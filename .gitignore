@@ -7,3 +7,6 @@ data/
 
 #odoo configuration files
 config/*.conf
+
+# Kubernetes secrets
+k8s/secrets/*.secret.yaml

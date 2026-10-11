@@ -1,0 +1,55 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: db-cliente-a
+  namespace: odoo-multitenant
+spec:
+  selector:
+    app: db-cliente-a
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: db-cliente-a
+  namespace: odoo-multitenant
+spec:
+  serviceName: db-cliente-a
+  replicas: 1
+  selector:
+    matchLabels:
+      app: db-cliente-a
+  template:
+    metadata:
+      labels:
+        app: db-cliente-a
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16
+          ports:
+            - name: postgres
+              containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: postgres
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: cliente-a-secrets
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: cliente-a-secrets
+                  key: POSTGRES_PASSWORD
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: postgres-data
+          persistentVolumeClaim:
+            claimName: postgres-cliente-a-pvc
