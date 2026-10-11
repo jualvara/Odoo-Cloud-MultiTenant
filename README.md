@@ -110,6 +110,60 @@ docker compose down
 
 El MVP local usa `.env` y archivos `.conf` ignorados por Git. En cloud, los secretos deben inyectarse desde un gestor de secretos del proveedor (por ejemplo, Secret Manager, Key Vault o Parameter Store) y nunca almacenarse en el repositorio, la imagen Docker o los registros.
 
+## Kubernetes local
+
+La carpeta `k8s/` contiene la versión declarativa de la arquitectura para Kubernetes. Compose y Kubernetes son entornos independientes: el primero mantiene el MVP local sencillo y el segundo permite practicar réplicas, recuperación de pods y autoescalado.
+
+### Preparación
+
+Con Kubernetes habilitado en Docker Desktop, crea el namespace y las copias privadas de los secretos:
+
+```powershell
+kubectl apply -f k8s\namespace.yaml
+Copy-Item k8s\secrets\cliente-a.secret.example.yaml k8s\secrets\cliente-a.secret.yaml
+Copy-Item k8s\secrets\cliente-b.secret.example.yaml k8s\secrets\cliente-b.secret.yaml
+```
+
+Edita las dos copias `.secret.yaml` con valores fuertes y privados; esos archivos están excluidos de Git. Después aplícalos y despliega los recursos:
+
+```powershell
+kubectl apply -f k8s\secrets\cliente-a.secret.yaml
+kubectl apply -f k8s\secrets\cliente-b.secret.yaml
+kubectl apply -f k8s\storage\postgres-pvc.yaml
+kubectl apply -f k8s\storage\odoo-filestore-pvc.yaml
+kubectl apply -f k8s\postgres\cliente-a.yaml
+kubectl apply -f k8s\postgres\cliente-b.yaml
+kubectl apply -f k8s\odoo\cliente-a.yaml
+kubectl apply -f k8s\odoo\cliente-b.yaml
+kubectl apply -f k8s\autoscaling\cliente-a-hpa.yaml
+```
+
+### Acceso local
+
+Usa túneles temporales para abrir cada instancia sin exponerla públicamente:
+
+```powershell
+kubectl port-forward -n odoo-multitenant service/odoo-cliente-a 8081:8069
+kubectl port-forward -n odoo-multitenant service/odoo-cliente-b 8082:8069
+```
+
+- Cliente A: `http://localhost:8081/web/login?db=cliente_a_k8s`
+- Cliente B: `http://localhost:8082/web/login?db=cliente_b_k8s`
+
+### Validación Kubernetes
+
+```powershell
+kubectl get pods,pvc -n odoo-multitenant
+kubectl get hpa -n odoo-multitenant
+kubectl top pods -n odoo-multitenant
+```
+
+Cliente A incluye dos réplicas y un `HorizontalPodAutoscaler` que puede aumentar hasta cuatro según CPU. Para pruebas locales de métricas, `k8s/metrics-server-local-patch.json` permite que Metrics Server consulte el kubelet de Docker Desktop. No debe trasladarse sin revisión a cloud, donde debe mantenerse la validación TLS.
+
+### Límites del laboratorio local
+
+El clúster local tiene un solo nodo y los PVC usan almacenamiento `ReadWriteOnce`. Las réplicas permiten practicar recuperación de pods y escalado, pero no tolerancia a la caída del equipo. Para cloud, Odoo requiere filestore compartido `ReadWriteMany` o almacenamiento de objetos, PostgreSQL administrado y un clúster con varios nodos para alta disponibilidad real.
+
 ## Estado del MVP
 
 - Dos instancias independientes de Odoo 19 Community.
@@ -117,3 +171,4 @@ El MVP local usa `.env` y archivos `.conf` ignorados por Git. En cloud, los secr
 - Dos redes Docker aisladas.
 - Seis volúmenes persistentes independientes: base de datos, filestore y addons por cliente.
 - Secretos locales excluidos de Git.
+- Manifiestos Kubernetes para dos clientes, persistencia, comprobaciones de salud y autoescalado de Odoo Cliente A.
